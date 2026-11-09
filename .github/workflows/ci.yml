@@ -1,0 +1,49 @@
+name: CI
+
+# Runs only on push to main, or merged PR.
+on:
+  push:
+    branches: [main]
+
+# Least privilege: token can only read code, so a compromised action/dependency can't modify the repo.
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: eu-west-1
+  ECR_REPOSITORY: wishifai-38
+
+jobs:
+  build-and-push:
+    name: Build and push image to ECR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+
+      # Keys come from GitHub Secrets.
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Gives Docker a temporary login to ECR. Output "registry" is used in the next step.
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Two tags: commit SHA unique, and latest.
+      - name: Build, tag and push image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}    # ECR address from login step
+          IMAGE_TAG: ${{ github.sha }}                   # full commit SHA, set by GitHub, 40 chars long
+        # Build image with both tags, then push to ECR.
+        run: |
+          docker build \
+            -t $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $REGISTRY/$ECR_REPOSITORY:latest \
+            .
+          docker push --all-tags $REGISTRY/$ECR_REPOSITORY
