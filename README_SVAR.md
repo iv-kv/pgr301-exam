@@ -17,7 +17,7 @@
 
 Appen lytter på port 8080 i containeren. `-p 9999:8080` gjør den tilgjengelig på **localhost:9999**.
 
-**Bygg ogGood kjør:**
+**Bygg og kjør:**
 
 ```bash
 docker build -t wishifai .
@@ -35,3 +35,18 @@ docker run --rm -p 9999:8080 \
 ```bash
 curl -F "image=@samples/sample_image.png" http://localhost:9999/api/analyze
 ```
+
+### 1B — CI-pipeline
+
+Workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+
+Grønn kjøring: https://github.com/iv-kv/pgr301-exam/actions/runs/42583104926
+
+Workflowen kjører kun ved push til `main` (også ved merge av PR). Den bygger imaget og pusher det til ECR-repoet `wishifai-38`. Kandidatnr er med i navnet for å unngå navnekollisjoner i delte klassekonto.
+
+AWS-nøkler ligger som GitHub Secrets (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`), ikke i workflow-filen.
+
+**Tagging-strategi:** hvert image får to tagger:
+
+- **Commit-SHA** (`github.sha`): unik og permanent. Viser nøyaktig hvilken kode som kjører, og gjør det enkelt å rulle tilbake til en tidligere versjon.
+- **`latest`**: peker alltid på nyeste image. Praktisk for testing, men sier ikke hvilken versjon det er — derfor ikke nok alene.
