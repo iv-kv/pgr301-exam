@@ -9,3 +9,8 @@ variable "candidate_number" {
   type        = string
   default     = "38"
 }
+
+variable "image_tag" {
+  description = "Image tag in ECR to deploy (commit SHA)"
+  type        = string
+}

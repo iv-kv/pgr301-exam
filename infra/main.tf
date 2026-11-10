@@ -60,3 +60,54 @@ resource "aws_iam_role_policy" "task" {
     ]
   })
 }
+
+# Existing ECR repo. Read only, fails early if missing.
+data "aws_ecr_repository" "app" {
+  name = "wishifai-${var.candidate_number}"
+}
+
+resource "aws_ecs_express_gateway_service" "app" {
+  service_name = "wishifai-${var.candidate_number}"
+
+  # Existing class roles (given in the task) + our own task role.
+  execution_role_arn      = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/ecsTaskExecutionRole"
+  infrastructure_role_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/service-role/ecsInfrastructureRoleForExpressServices"
+  task_role_arn           = aws_iam_role.task.arn
+
+  # Smaller than default (1 vCPU / 2 GB) to keep cost down.
+  cpu    = "512"
+  memory = "1024"
+
+  # Default is "/", which the app doesn't serve.
+  health_check_path = "/actuator/health"
+
+  # Wait until tasks are healthy, so a broken deploy fails the apply.
+  wait_for_steady_state = true
+
+  primary_container {
+    image          = "${data.aws_ecr_repository.app.repository_url}:${var.image_tag}"
+    container_port = 8080
+
+    # Bucket name set automatically from the bucket resource.
+    environment {
+      name  = "S3_BUCKET"
+      value = aws_s3_bucket.images.bucket
+    }
+
+    environment {
+      name  = "AWS_REGION"
+      value = var.region
+    }
+  }
+
+  # Cost safety: max 2 tasks (default is 20).
+  scaling_target {
+    min_task_count            = 1
+    max_task_count            = 2
+    auto_scaling_metric       = "AVERAGE_CPU"
+    auto_scaling_target_value = 60
+  }
+
+  # Keep policy until service is gone, otherwise delete can hang in DRAINING.
+  depends_on = [aws_iam_role_policy.task]
+}
