@@ -47,3 +47,47 @@ jobs:
             -t $REGISTRY/$ECR_REPOSITORY:latest \
             .
           docker push --all-tags $REGISTRY/$ECR_REPOSITORY
+
+  terraform:
+    name: Deploy with Terraform
+    runs-on: ubuntu-latest
+    # Runs only after the image exists in ECR.
+    needs: build-and-push
+    # Never run two applies at once against the same state.
+    concurrency:
+      group: terraform
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: infra
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Same version as local, so state and lock file stay compatible.
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.17.0
+
+      # Fails the pipeline if code isn't formatted.
+      - name: Check formatting
+        run: terraform fmt -check -recursive
+
+      - name: Init
+        run: terraform init -input=false
+
+      - name: Validate
+        run: terraform validate
+
+      # Deploys the image built in the previous job (same commit SHA).
+      - name: Apply
+        run: terraform apply -auto-approve -input=false -var image_tag=${{ github.sha }}
