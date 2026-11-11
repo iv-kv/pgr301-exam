@@ -1,6 +1,7 @@
 package no.pgr301.exam.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import no.pgr301.exam.model.GiftAnalysis;
@@ -113,16 +114,46 @@ public class BedrockService {
                     .register(registry));
         }
 
+        recordTokens(resp);
+
         String text = resp.output().message().content().get(0).text();
         return parseAnalysis(text);
+    }
+
+    // Tokens per call. Output tokens drive both Bedrock latency and cost.
+    private void recordTokens(ConverseResponse resp) {
+        if (resp.usage() == null) {
+            return;
+        }
+        tokens("input").record(resp.usage().inputTokens());
+        tokens("output").record(resp.usage().outputTokens());
+    }
+
+    private DistributionSummary tokens(String type) {
+        return DistributionSummary.builder("wishifai.bedrock.tokens")
+                .description("Bedrock tokens per call")
+                .baseUnit("tokens")
+                .tag("type", type)
+                .register(registry);
+    }
+
+    // Business metric: gift suggestions per analysis. 0 means the answer could not be parsed.
+    private void recordSuggestions(int count) {
+        DistributionSummary.builder("wishifai.gift.suggestions")
+                .description("Gift suggestions per analysis")
+                .register(registry)
+                .record(count);
     }
 
     private GiftAnalysis parseAnalysis(String text) {
         try {
             Matcher m = JSON_OBJECT.matcher(text);
             String json = m.find() ? m.group() : text;
-            return MAPPER.readValue(json, GiftAnalysis.class);
+            GiftAnalysis analysis = MAPPER.readValue(json, GiftAnalysis.class);
+            recordSuggestions(analysis.suggestions() == null ? 0 : analysis.suggestions().size());
+            return analysis;
         } catch (Exception e) {
+            recordSuggestions(0);
             return new GiftAnalysis(
                     "(ukjent)",
                     "(kunne ikke parse svar)",

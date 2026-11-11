@@ -138,3 +138,31 @@ Grønn kjøring: <LENKE>
 | `wishifai.bedrock.duration` | Tid for `Converse`-kallet til Claude | hvor mye som går til LLM-en |
 
 Timere måler kun selve AWS-kallet, ikke hele requesten. Da kan de sammenlignes direkte og vise **hvor tiden blir av**. Begge har taggen `outcome` (`success`/`error`), så feilede kall ikke blander seg med vellykkede. CloudWatch får `count`, `avg`, `max` og `sum` for hver.
+
+**Funn:** Tre testkall mot `/api/analyze` (ca. 19 s totalt hver):
+
+| | Snitt | Maks |
+|---|---|---|
+| Rekognition | ~1,3 s | 1,7 s |
+| Bedrock | ~15,3 s | 16,1 s |
+
+Bedrock står for det meste av svartiden. Prompten ber Claude resonnere i flere steg og skrive inntil 5 begrunnede forslag - grunnen er sikkert der. 
+
+**Business-metrikker (DistributionSummary):**
+
+| Metrikk | Hva | Hvorfor |
+|---|---|---|
+| `wishifai.gift.suggestions` | Antall gaveforslag per analyse | **Hovedmetrikken.** Viser om tjenesten faktisk gjør sin jobb. `count` = antall analyser, `avg` = kvalitet. `0` betyr at svaret fra Claude ikke kunne parses — en feil som ellers er usynlig, siden appen fortsatt svarer HTTP 200. |
+| `wishifai.bedrock.tokens` (`type=input/output`) | Tokens per Bedrock-kall | Tokens er det vi betaler for. Output-tokens forklarer også hvorfor Bedrock er tregt. |
+| `wishifai.rekognition.labels` | Antall labels per bilde | Få labels gir Claude lite å jobbe med, og forslagene blir svakere. |
+
+### 3B — Dashboard og alarm
+
+**Dashboard:** `wishifai-38` ([`infra/dashboard.tf`](infra/dashboard.tf))
+
+| Rad | Innhold |
+|---|---|
+| Business | Antall analyser, forslag per analyse, tokens |
+| Latency | Rekognition vs Bedrock, HTTP `/api/analyze` |
+| Infrastruktur | ECS CPU, minne, antall tasks |
+| Applikasjon | JVM heap, GC-pausetid |
