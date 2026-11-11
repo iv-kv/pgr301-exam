@@ -1,5 +1,6 @@
 package no.pgr301.exam.service;
 
+import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.springframework.stereotype.Service;
@@ -33,7 +34,13 @@ public class RekognitionService {
                     .maxLabels(20)
                     .minConfidence(70f)
                     .build());
-            return resp.labels().stream().map(Label::name).toList();
+            List<String> labels = resp.labels().stream().map(Label::name).toList();
+            // Few labels give Bedrock little to work with, so suggestions get weaker.
+            DistributionSummary.builder("wishifai.rekognition.labels")
+                    .description("Labels found per image")
+                    .register(registry)
+                    .record(labels.size());
+            return labels;
         } catch (RuntimeException e) {
             outcome = "error";
             throw e;
