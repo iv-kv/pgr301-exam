@@ -50,3 +50,68 @@ AWS-nøkler ligger som GitHub Secrets (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_K
 
 - **Commit-SHA** (`github.sha`): unik og permanent. Viser nøyaktig hvilken kode som kjører, og gjør det enkelt å rulle tilbake til en tidligere versjon.
 - **`latest`**: peker alltid på nyeste image. Praktisk for testing, men sier ikke hvilken versjon det er — derfor ikke nok alene.
+
+---
+
+## Oppgave 2 — ECS Express og IaC
+
+### 2A — Infrastruktur for tjenesten
+
+**URL til serveren:** https://wi-53f46ebe9d8f432183383e69acff870d.ecs.eu-west-1.on.aws
+
+**Test:**
+
+```bash
+curl https://wi-53f46ebe9d8f432183383e69acff870d.ecs.eu-west-1.on.aws/actuator/health
+curl -F "image=@samples/sample_image.png" https://wi-53f46ebe9d8f432183383e69acff870d.ecs.eu-west-1.on.aws/api/analyze
+```
+
+All Terraform-kode ligger i `infra/`:
+
+| Fil | Innhold |
+|---|---|
+| `providers.tf` | AWS-provider og S3-backend |
+| `variables.tf` | `region`, `candidate_number`, `image_tag` |
+| `main.tf` | S3-bucket, task role og ECS Express-tjeneste |
+| `outputs.tf` | `service_url` og `s3_bucket` |
+
+**Ressurser:**
+
+- **S3-bucket** `pgr301-wishifai-38-images` for opplastede bilder.
+- **Task role** `wishifai-task-role-38` kun tillatelser appen faktisk bruker (least privilege):
+  - `s3:PutObject` — i egen bucket
+  - `rekognition:DetectLabels`
+  - `bedrock:InvokeModel` — Claude Sonnet 4.5
+- **ECS Express-tjeneste** `wishifai-38`, bruker eksisterende execution- og infrastructure-rollene fra klassekonto.
+
+**Valg:**
+
+- `S3_BUCKET` settes automatisk fra bucket-ressursen.
+- `image_tag` har ingen default og settes til github sin commit-SHA. Da ser Terraform endring ved hver ny versjon og deployer den.
+- Mindre størrelse enn default (0,5 vCPU / 1 GB i stedet for 1 vCPU / 2 GB) for å spare kostnad.
+- Autoskalering begrenset til maks 2 tasks (default er 20), som sikring mot uventede kostnader.
+- Health check på `/actuator/health`, siden appen ikke svarer på `/`.
+- `wait_for_steady_state = true`: `apply` venter til tjenesten faktisk kjører. En ødelagt deploy gjør dermed pipelinen rød.
+
+### 2B — Remote state
+
+State lagres i den delte bucketen `pgr301-terraform-state` med nøkkelen:
+
+```
+wishifai/38/terraform.tfstate
+```
+
+Kandidatnummeret i nøkkelen gjør at state er unik. `use_lockfile = true` gir låsing i S3, slik at to `apply` ikke kan skrive til samme state samtidig.
+
+### 2C — Terraform i GitHub Actions
+
+Workflowen har nå to jobber: `build-and-push` og `terraform`. Terraform-jobben har `needs: build-and-push` og kjører:
+
+1. `terraform fmt -check -recursive` — pipelinen feiler hvis koden ikke er formatert
+2. `terraform init`
+3. `terraform validate`
+4. `terraform apply -auto-approve -var image_tag=<commit-SHA>`
+
+Grønn kjøring: <LENKE>
+
+**Terraform kjører etter container-build:** Terraform deployer imaget med taggen `<commit-SHA>`. Dette imaget må finnes i ECR før tjenesten oppdateres. Ellers kan den peke på et image som ikke finnes ennå, og deployen feiler. Med `needs:` deployes ingenting hvis bygget feiler.
