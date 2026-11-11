@@ -8,6 +8,11 @@ output "dashboard_name" {
   value       = aws_cloudwatch_dashboard.main.dashboard_name
 }
 
+output "alarm_name" {
+  description = "CloudWatch alarm on Bedrock latency"
+  value       = aws_cloudwatch_metric_alarm.bedrock_slow.alarm_name
+}
+
 output "s3_bucket" {
   description = "Bucket for uploaded images"
   value       = aws_s3_bucket.images.bucket

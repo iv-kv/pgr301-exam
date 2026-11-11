@@ -166,3 +166,11 @@ Bedrock står for det meste av svartiden. Prompten ber Claude resonnere i flere 
 | Latency | Rekognition vs Bedrock, HTTP `/api/analyze` |
 | Infrastruktur | ECS CPU, minne, antall tasks |
 | Applikasjon | JVM heap, GC-pausetid |
+
+**Alarm:** `wishifai-38-bedrock-slow` ([`infra/alarms.tf`](infra/alarms.tf))
+
+Går av når snittet av `wishifai.bedrock.duration` er over **30 s** i 3 minutter på rad. Varsel (og OK når det er over) sendes på e-post via SNS.
+
+- Bedrock er ca. 80 % av svartiden, så tregt Bedrock = treg tjeneste — akkurat det gründeren er bekymret for.
+- Normalt ~15 s, så 30 s betyr en reell dobling, ikke tilfeldig variasjon.
+- `treat_missing_data = notBreaching`: lite trafikk skal ikke utløse alarm.
