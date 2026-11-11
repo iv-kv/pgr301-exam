@@ -160,6 +160,8 @@ Bedrock står for det meste av svartiden. Prompten ber Claude resonnere i flere 
 
 **Dashboard:** `wishifai-38` ([`infra/dashboard.tf`](infra/dashboard.tf))
 
+![Dashboard](media/dashboard.png)
+
 | Rad | Innhold |
 |---|---|
 | Business | Antall analyser, forslag per analyse, tokens |
@@ -174,3 +176,9 @@ Går av når snittet av `wishifai.bedrock.duration` er over **30 s** i 3 minutte
 - Bedrock er ca. 80 % av svartiden, så tregt Bedrock = treg tjeneste — akkurat det gründeren er bekymret for.
 - Normalt ~15 s, så 30 s betyr en reell dobling, ikke tilfeldig variasjon.
 - `treat_missing_data = notBreaching`: lite trafikk skal ikke utløse alarm.
+
+**Test av alarmen:** Tvunget til ALARM med `aws cloudwatch set-alarm-state`. E-post kom fram, og alarmen gikk tilbake til OK av seg selv etter 2 min.
+
+| ALARM | OK |
+|---|---|
+| ![ALARM-e-post](media/email_alarm.png) | ![OK-e-post](media/email_ok.png) |
