@@ -1,6 +1,8 @@
 package no.pgr301.exam.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import no.pgr301.exam.model.GiftAnalysis;
 import no.pgr301.exam.model.GiftSuggestion;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,11 +26,14 @@ public class BedrockService {
 
     private final BedrockRuntimeClient client;
     private final String modelId;
+    private final MeterRegistry registry;
 
     public BedrockService(BedrockRuntimeClient client,
-                          @Value("${app.bedrock.model-id}") String modelId) {
+                          @Value("${app.bedrock.model-id}") String modelId,
+                          MeterRegistry registry) {
         this.client = client;
         this.modelId = modelId;
+        this.registry = registry;
     }
 
     /**
@@ -86,13 +91,27 @@ public class BedrockService {
                 }
                 """.formatted(String.join(", ", labels));
 
-        ConverseResponse resp = client.converse(ConverseRequest.builder()
-                .modelId(modelId)
-                .messages(Message.builder()
-                        .role(ConversationRole.USER)
-                        .content(ContentBlock.fromText(prompt))
-                        .build())
-                .build());
+        // Measures only the AWS call. Outcome tag splits successful and failed calls.
+        Timer.Sample sample = Timer.start(registry);
+        String outcome = "success";
+        ConverseResponse resp;
+        try {
+            resp = client.converse(ConverseRequest.builder()
+                    .modelId(modelId)
+                    .messages(Message.builder()
+                            .role(ConversationRole.USER)
+                            .content(ContentBlock.fromText(prompt))
+                            .build())
+                    .build());
+        } catch (RuntimeException e) {
+            outcome = "error";
+            throw e;
+        } finally {
+            sample.stop(Timer.builder("wishifai.bedrock.duration")
+                    .description("Time spent in Bedrock Converse")
+                    .tag("outcome", outcome)
+                    .register(registry));
+        }
 
         String text = resp.output().message().content().get(0).text();
         return parseAnalysis(text);

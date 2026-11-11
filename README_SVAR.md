@@ -115,3 +115,26 @@ Workflowen har nå to jobber: `build-and-push` og `terraform`. Terraform-jobben 
 Grønn kjøring: <LENKE>
 
 **Terraform kjører etter container-build:** Terraform deployer imaget med taggen `<commit-SHA>`. Dette imaget må finnes i ECR før tjenesten oppdateres. Ellers kan den peke på et image som ikke finnes ennå, og deployen feiler. Med `needs:` deployes ingenting hvis bygget feiler.
+
+---
+
+## Oppgave 3 — Observability
+
+### 3A — Metrikker i applikasjonen
+
+**Oppsett:** `MetricsConfig` hadde tomt namespace (`""`), som CloudWatch avviser. Derfor feilmeldingene i loggen. Nå den er `wishifai-38`.
+
+**Kostnadskontroll:** CloudWatch tar betalt per metrikk. Spring Boot lager over hundre metrikker automatisk, så et `MeterFilter` slipper bare gjennom de vi bruker:
+
+- `wishifai.*` — egne metrikker
+- `http.server.requests` — HTTP-latency
+- `jvm.memory.used`, `jvm.gc.pause` — JVM-minne og GC-tid
+
+**Timer:**
+
+| Metrikk | Hva | Hvorfor |
+|---|---|---|
+| `wishifai.rekognition.duration` | Tid for `DetectLabels`-kallet | hvor mye tiden går til bildeanalyse |
+| `wishifai.bedrock.duration` | Tid for `Converse`-kallet til Claude | hvor mye som går til LLM-en |
+
+Timere måler kun selve AWS-kallet, ikke hele requesten. Da kan de sammenlignes direkte og vise **hvor tiden blir av**. Begge har taggen `outcome` (`success`/`error`), så feilede kall ikke blander seg med vellykkede. CloudWatch får `count`, `avg`, `max` og `sum` for hver.
