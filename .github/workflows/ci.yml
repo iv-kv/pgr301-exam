@@ -91,3 +91,6 @@ jobs:
       # Deploys the image built in the previous job (same commit SHA).
       - name: Apply
         run: terraform apply -auto-approve -input=false -var image_tag=${{ github.sha }}
+        # Email kept in Secrets, so it's not exposed in the public repo.
+        env:
+          TF_VAR_alarm_email: ${{ secrets.ALARM_EMAIL }}
