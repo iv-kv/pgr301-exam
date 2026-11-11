@@ -129,3 +129,12 @@ Grønn kjøring: <LENKE>
 - `wishifai.*` — egne metrikker
 - `http.server.requests` — HTTP-latency
 - `jvm.memory.used`, `jvm.gc.pause` — JVM-minne og GC-tid
+
+**Timer:**
+
+| Metrikk | Hva | Hvorfor |
+|---|---|---|
+| `wishifai.rekognition.duration` | Tid for `DetectLabels`-kallet | hvor mye tiden går til bildeanalyse |
+| `wishifai.bedrock.duration` | Tid for `Converse`-kallet til Claude | hvor mye som går til LLM-en |
+
+Timere måler kun selve AWS-kallet, ikke hele requesten. Da kan de sammenlignes direkte og vise **hvor tiden blir av**. Begge har taggen `outcome` (`success`/`error`), så feilede kall ikke blander seg med vellykkede. CloudWatch får `count`, `avg`, `max` og `sum` for hver.
