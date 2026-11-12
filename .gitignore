@@ -36,3 +36,6 @@ override.tf.json
 .env.*
 *.local
 *.pem
+
+# Draft documents
+media/*.odt

@@ -160,6 +160,8 @@ Bedrock står for det meste av svartiden. Prompten ber Claude resonnere i flere 
 
 **Dashboard:** `wishifai-38` ([`infra/dashboard.tf`](infra/dashboard.tf))
 
+![Dashboard](media/dashboard.png)
+
 | Rad | Innhold |
 |---|---|
 | Business | Antall analyser, forslag per analyse, tokens |
@@ -174,3 +176,23 @@ Går av når snittet av `wishifai.bedrock.duration` er over **30 s** i 3 minutte
 - Bedrock er ca. 80 % av svartiden, så tregt Bedrock = treg tjeneste — akkurat det gründeren er bekymret for.
 - Normalt ~15 s, så 30 s betyr en reell dobling, ikke tilfeldig variasjon.
 - `treat_missing_data = notBreaching`: lite trafikk skal ikke utløse alarm.
+
+**Test av alarmen:** Tvunget til ALARM med `aws cloudwatch set-alarm-state`. E-post kom fram, og alarmen gikk tilbake til OK av seg selv etter 2 min.
+
+| ALARM | OK |
+|---|---|
+| ![ALARM-e-post](media/email_alarm.png) | ![OK-e-post](media/email_ok.png) |
+
+## Oppgave 4 — Drøfteoppgave
+
+### LLM i DevOps
+
+Verden innen softwareutvikling og DevOps har endret seg mye de siste årene. KI finnes overalt og skriver det meste av produksjonskoden. Det er ikke noe dårlig i seg selv, men det innebærer mer risiko enn gammeldags programmering. Det viktigste er å forstå koden som blir pushet, og her er terskelen noen ganger ikke veldig høy. Som nevnt i forelesningen blir mye kode sendt til review fort, og det kan hende at den samme KI-modellen som skrev koden, blir bedt om å sjekke den – og da er muligheten for feil reell.
+
+**Risiko og ansvar** – her er det viktig å huske at det er vi utviklere, som pusher kode og godkjenner PR-er, som har ansvaret for hvordan appen vår fungerer og hva den gjør. I mer kritiske områder, som en bank, er det fortsatt spesialister med erfaring og de rette sertifiseringene som skal sjekke det endelige resultatet, tror jeg. I vårt eksempel med gaveanbefalinger kan en mellomsjekk med en annen KI-modell være nok.
+
+**Testing** er også et problem, fordi svaret fra en LLM ikke er det samme hver gang, så man kan ikke bare sjekke at output er lik forventet tekst. I stedet kan man ha et eval-sett, f.eks. 20–30 lister med labels fra Rekognition, og sjekke at svaret er gyldig JSON, har maks 5 forslag og ikke inneholder ting fra en «forbudt» liste. Litt mer avansert, om gaven passer alderen, kan en annen modell vurdere (LLM-as-judge). I Wishifai ligger prompten rett i `BedrockService`, så en endring i prompt går gjennom CI uansett, og eval-testen kunne kjørt der før deploy. I en bank burde i tillegg et menneske godkjenne hver prompt- eller modellendring.
+
+**Ang. kontinuerlig leveranse** – tilfellet der prompten oppgis av brukeren, er litt spesielt og bærer mer risiko. Vi kunne satt inn en KI-modell som sjekker at teksten ikke er farlig før den sendes videre, og en annen som sjekker outputen. Feature flags er kanskje det beste verktøyet her: med dem kan vi slå av en modell som gir farlige svar med en gang, og gå tilbake til en statisk liste eller koble på en annen modell. Canary passer fint for en gaveapp, men i en bank vil jo også 5 % av kundene få feil råd.
+
+**Overvåking** er et annet viktig tema. Alarmen jeg lagde i oppgave 3 går bare av når Bedrock bruker over 30 sekunder, så den ville vært grønn selv om appen foreslo en kniv til et barnerom. Noen metrikker vi allerede har, kan hjelpe litt: hvis antall gaveforslag plutselig går mot 0, nekter kanskje modellen å svare eller JSON er ødelagt, og en stor endring i token-forbruk kan bety at modellen oppfører seg annerledes (og koster mer). I tillegg ville jeg fulgt med på andelen «dårlige» svar, f.eks. med stikkprøver, og hatt en knapp der brukeren kan rapportere rare forslag. Man bør også begrense brukere som provoserer KI-en med rare og farlige prompter.
