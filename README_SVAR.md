@@ -112,7 +112,7 @@ Workflowen har nå to jobber: `build-and-push` og `terraform`. Terraform-jobben 
 3. `terraform validate`
 4. `terraform apply -auto-approve -var image_tag=<commit-SHA>`
 
-Grønn kjøring: <LENKE>
+Grønn kjøring: <https://github.com/iv-kv/pgr301-exam/actions/runs/43030150561>
 
 **Terraform kjører etter container-build:** Terraform deployer imaget med taggen `<commit-SHA>`. Dette imaget må finnes i ECR før tjenesten oppdateres. Ellers kan den peke på et image som ikke finnes ennå, og deployen feiler. Med `needs:` deployes ingenting hvis bygget feiler.
 
